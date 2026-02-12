@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batrium Kapazitätstest Cockpit</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#121923; --text:#e6edf3; --muted:#9fb0c3; --ok:#25c26e; --warn:#f0b429; --bad:#e5534b; }
+    body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1400px;margin:20px auto;padding:0 16px}
+    h1{margin:0 0 12px;font-size:24px}
+    h3{margin:4px 0 10px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{background:var(--card);border:1px solid #233044;border-radius:12px;padding:12px}
+    .span-12{grid-column:span 12}.span-6{grid-column:span 6}.span-4{grid-column:span 4}.span-3{grid-column:span 3}.span-2{grid-column:span 2}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+    input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #2a3950;background:#0f1520;color:var(--text)}
+    button{cursor:pointer;background:#1b2b43}
+    button:hover{filter:brightness(1.1)}
+    .kpi{font-size:26px;font-weight:700}
+    .kpi7{font-family:'Courier New',monospace;color:#8de2ff;text-shadow:0 0 8px rgba(80,190,255,.25);word-break:break-word}
+    .kpi7 .val{font-size:34px;line-height:1.05;letter-spacing:1px}
+    .kpi7 .upd{font-size:11px;line-height:1.2;color:#9fb0c3;letter-spacing:.2px;margin-top:2px}
+    .muted{color:var(--muted);font-size:12px}
+    .row{display:flex;gap:8px;align-items:center}
+    .row > *{flex:1}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    td,th{border-bottom:1px solid #223044;padding:8px;text-align:left}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .chart{width:100%;height:220px;border:1px solid #223044;border-radius:8px;background:#0e1520}
+    .chartWrap{position:relative}
+    .tt{position:absolute;pointer-events:none;background:#0a1019;border:1px solid #35507a;color:#e8f0fb;padding:6px 8px;border-radius:8px;font-size:12px;display:none;white-space:nowrap;z-index:10}
+    .essVal{font-size:24px;font-weight:700;min-width:80px;text-align:center}
+    @media (max-width:1100px){.span-6,.span-4,.span-3,.span-2{grid-column:span 12}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Batrium Kapazitätstest Cockpit (HA Recorder + Live)</h1>
+
+    <div class="grid">
+      <div class="card span-12">
+        <div class="row">
+          <div>
+            <label>Home Assistant URL</label>
+            <input id="haUrl" placeholder="http://192.168.178.119:8123" />
+          </div>
+          <div>
+            <label>Long-Lived Access Token</label>
+            <input id="haToken" type="password" placeholder="eyJ..." />
+          </div>
+          <div style="max-width:220px">
+            <label>&nbsp;</label>
+            <button id="connectBtn">Verbinden</button>
+          </div>
+        </div>
+        <div class="muted" id="connState">Nicht verbunden</div>
+      </div>
+
+      <div class="card span-3"><div class="muted">Min Cell V</div><div class="kpi7" id="minCellLive">-</div></div>
+      <div class="card span-3"><div class="muted">Max Cell V</div><div class="kpi7" id="maxCellLive">-</div></div>
+      <div class="card span-2"><div class="muted">SoC</div><div class="kpi7" id="socLive">-</div></div>
+      <div class="card span-2"><div class="muted">Shunt V</div><div class="kpi7" id="shuntVLive">-</div></div>
+      <div class="card span-2"><div class="muted">Shunt A</div><div class="kpi7" id="shuntALive">-</div></div>
+      <div class="card span-2"><div class="muted">Shunt W</div><div class="kpi7" id="shuntWLive">-</div></div>
+      <div class="card span-2"><div class="muted">Status</div><div class="kpi" id="status">-</div></div>
+
+      <div class="card span-12">
+        <h3>ESS Ziel-SoC (number.victron_settings_ess_batterylife_minimumsoc)</h3>
+        <div class="row">
+          <div style="flex:4">
+            <input id="essTargetSlider" type="range" min="0" max="100" step="1" value="20" />
+          </div>
+          <div class="essVal" id="essTargetLabel">20 %</div>
+          <div style="max-width:220px"><button id="setEssTargetBtn">Setzen</button></div>
+          <div style="max-width:160px"><button id="ess20Btn">Min 20%</button></div>
+          <div style="max-width:160px"><button id="ess100Btn">Laden 100%</button></div>
+        </div>
+        <div class="muted" id="essInfo">-</div>
+      </div>
+
+      <div class="card span-3">
+        <h3>Trend SoC (24h)</h3>
+        <div class="chartWrap"><canvas id="trendSocChart" class="chart" width="320" height="220"></canvas><div id="ttSoc" class="tt"></div></div>
+      </div>
+      <div class="card span-3">
+        <h3>Trend Zellspannung Min/Max (24h)</h3>
+        <div class="chartWrap"><canvas id="trendCellVoltChart" class="chart" width="320" height="220"></canvas><div id="ttCellVolt" class="tt"></div></div>
+      </div>
+      <div class="card span-3">
+        <h3>Trend Shunt V/A/W (24h)</h3>
+        <div class="chartWrap"><canvas id="trendShuntChart" class="chart" width="320" height="220"></canvas><div id="ttShunt" class="tt"></div></div>
+      </div>
+      <div class="card span-3">
+        <h3>Trend CumDischg (24h)</h3>
+        <div class="chartWrap"><canvas id="trendCumChart" class="chart" width="320" height="220"></canvas><div id="ttCum" class="tt"></div></div>
+      </div>
+
+      <div class="card span-12">
+        <h3>Live Zellenspannungen (32 Zellen, _2 gefiltert)</h3>
+        <div class="chartWrap">
+          <canvas id="cellChart" class="chart" width="1200" height="260"></canvas>
+          <div id="cellTooltip" class="tt"></div>
+        </div>
+        <div class="muted" id="cellInfo">Y-Achse fix: 2.50V bis 3.75V</div>
+      </div>
+
+      <div class="card span-6">
+        <h3>Startpunkt (T0)</h3>
+        <div class="row">
+          <button id="setStartNow">Start = Jetzt (Live übernehmen)</button>
+          <button id="clearStart">Start löschen</button>
+        </div>
+        <table>
+          <tr><th>Zeit</th><td id="t0_time">-</td></tr>
+          <tr><th>SoC_start</th><td id="t0_soc">-</td></tr>
+          <tr><th>CumDischg_start</th><td id="t0_cum">-</td></tr>
+          <tr><th>MinCellVolt_start</th><td id="t0_v">-</td></tr>
+        </table>
+      </div>
+
+      <div class="card span-6">
+        <h3>Endpunkt (T1)</h3>
+        <div class="row">
+          <button id="setEndNow">Ende = Jetzt (Live übernehmen)</button>
+          <button id="clearEnd">Ende löschen</button>
+        </div>
+        <table>
+          <tr><th>Zeit</th><td id="t1_time">-</td></tr>
+          <tr><th>SoC_end</th><td id="t1_soc">-</td></tr>
+          <tr><th>CumDischg_end</th><td id="t1_cum">-</td></tr>
+          <tr><th>MinCellVolt_end</th><td id="t1_v">-</td></tr>
+        </table>
+      </div>
+
+      <div class="card span-12">
+        <h3>Berechnung (resetfest)</h3>
+        <div class="row">
+          <div>
+            <label>Mittlere Batteriespannung für Ah-Umrechnung (V)</label>
+            <div class="row">
+              <input id="avgV" type="number" step="0.01" value="51.8" />
+              <label style="display:flex;align-items:center;gap:6px;min-width:190px;margin:0;color:var(--text)">
+                <input id="autoAvgV" type="checkbox" checked style="width:auto;accent-color:#64b5f6" /> Auto aus Historie
+              </label>
+            </div>
+            <div class="muted" id="avgVInfo">V_mittel: -</div>
+          </div>
+          <div>
+            <label>Gültig ab SoC-Drop (%)</label>
+            <input id="minDrop" type="number" step="0.1" value="5" />
+          </div>
+          <div>
+            <label>MinCellVolt-Stopgrenze (V)</label>
+            <input id="stopVolt" type="number" step="0.01" value="3.00" />
+          </div>
+        </div>
+        <table>
+          <tr><th>SoC_drop</th><td id="calc_drop">-</td></tr>
+          <tr><th>kWh_used (resetfest)</th><td id="calc_used">-</td></tr>
+          <tr><th>Kapazität_kWh</th><td id="calc_kwh">-</td></tr>
+          <tr><th>Kapazität_Ah</th><td id="calc_ah">-</td></tr>
+          <tr><th>Validierung</th><td id="calc_valid">Warte auf T0/T1</td></tr>
+        </table>
+      </div>
+
+      <div class="card span-12">
+        <h3>Rechenschritte (transparent)</h3>
+        <table>
+          <tr><th>Schritt</th><th>Formel</th><th>Wert</th></tr>
+          <tr><td>1</td><td>SoC_drop = SoC_start - SoC_end</td><td id="s1">-</td></tr>
+          <tr><td>2</td><td>kWh_used = Σ positive Δ(cum_dischg) (resetfest)</td><td id="s2">-</td></tr>
+          <tr><td>3</td><td>Kapazität_kWh = kWh_used × 100 / SoC_drop</td><td id="s3">-</td></tr>
+          <tr><td>4</td><td>Kapazität_Ah = Kapazität_kWh × 1000 / V_mittel</td><td id="s4">-</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+const E = {
+  soc: 'sensor.batrium_shuntsoc',
+  minV: 'sensor.batrium_mincellvolt',
+  maxV: 'sensor.batrium_maxcellvolt',
+  cum: 'sensor.batrium_shuntcumulkwhdischg',
+  current: 'sensor.batrium_shuntcurrent',
+  voltage: 'sensor.batrium_shuntvoltage',
+  essMinSoc: 'number.victron_settings_ess_batterylife_minimumsoc'
+};
+
+let cfg = JSON.parse(localStorage.getItem('batriumCfg') || '{}');
+let t0 = JSON.parse(localStorage.getItem('batriumT0') || 'null');
+let t1 = JSON.parse(localStorage.getItem('batriumT1') || 'null');
+let live = null;
+let hoverCells = { bars: [] };
+const chartState = {};
+
+const $ = id => document.getElementById(id);
+$('haUrl').value = cfg.url || 'http://192.168.178.119:8123';
+$('haToken').value = cfg.token || '';
+
+function saveCfg(){
+  cfg = { url: $('haUrl').value.trim().replace(/\/$/, ''), token: $('haToken').value.trim() };
+  localStorage.setItem('batriumCfg', JSON.stringify(cfg));
+}
+
+async function api(path, options={}){
+  const r = await fetch(path, { ...options, headers: { ...(options.headers||{}), 'X-HA-Url': cfg.url, 'X-HA-Token': cfg.token, 'Content-Type':'application/json' } });
+  if(!r.ok) throw new Error(`${path}: ${r.status}`);
+  return r.json();
+}
+async function getState(entity){ return api(`/proxy/states/${encodeURIComponent(entity)}`); }
+async function getStates(){ return api(`/proxy/states`); }
+async function getHistory(entity, startIso, endIso){
+  const arr = await api(`/proxy/history?entity=${encodeURIComponent(entity)}&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`);
+  return (arr && arr[0]) ? arr[0] : [];
+}
+async function setNumber(entity, value){
+  return api(`/proxy/services/number/set_value`, { method:'POST', body: JSON.stringify({ entity_id: entity, value }) });
+}
+
+function parseNum(x){ const v = Number(x); return Number.isFinite(v) ? v : null; }
+function fmt(v, u=''){ return (v===null||v===undefined||Number.isNaN(v)) ? '-' : `${v.toFixed(2)}${u}`; }
+function fmt7(v,u=''){ return (v===null||v===undefined||Number.isNaN(v)) ? '--.--' : `${v.toFixed(2)}${u}`; }
+function tstamp(iso){ if(!iso) return '-'; const d=new Date(iso); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; }
+function withUpdText(val, iso){ return `${val}  ·  upd ${tstamp(iso)}`; }
+function withUpdHtml(val, iso){ return `<div class="val">${val}</div><div class="upd">upd ${tstamp(iso)}</div>`; }
+
+function updateEndControls(){
+  const canSetEnd = !!t0;
+  $('setEndNow').disabled = !canSetEnd;
+  if(!canSetEnd) $('setEndNow').title = 'Erst T0 setzen';
+  else $('setEndNow').title = '';
+}
+
+function updateTViews(){
+  for(const [p,obj] of [['t0',t0],['t1',t1]]){
+    $(`${p}_time`).textContent = obj?.time || '-';
+    $(`${p}_soc`).textContent = obj ? withUpdText(fmt(obj?.soc, ' %'), obj.time) : '-';
+    $(`${p}_cum`).textContent = obj ? withUpdText(fmt(obj?.cum, ' kWh'), obj.time) : '-';
+    $(`${p}_v`).textContent = obj ? withUpdText(fmt(obj?.minV, ' V'), obj.time) : '-';
+  }
+  updateEndControls();
+}
+
+async function computeUsedResetSafe(startIso, endIso){
+  if(!startIso || !endIso) throw new Error('T0/T1 Zeit fehlt');
+  const hist = await getHistory(E.cum, startIso, endIso);
+  let used = 0, prev = null;
+  for(const row of hist){
+    const v = parseNum(row.state);
+    if(v===null) continue;
+    if(prev===null){ prev=v; continue; }
+    if(v >= prev) used += (v - prev);
+    prev = v;
+  }
+  return used;
+}
+
+async function computeAvgVoltage(startIso, endIso){
+  const hist = await getHistory(E.voltage, startIso, endIso);
+  const vals = hist.map(r=>parseNum(r.state)).filter(v=>v!==null);
+  if(!vals.length) throw new Error('Keine Spannungs-Historie im Zeitraum');
+  const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+  return avg;
+}
+
+async function calc(){
+  if(!t0 || !t1){
+    $('calc_drop').textContent='-';$('calc_used').textContent='-';$('calc_kwh').textContent='-';$('calc_ah').textContent='-';
+    $('calc_valid').textContent='Bitte T0 und T1 setzen';
+    $('avgVInfo').textContent='V_mittel: warte auf T0/T1';
+    ['s1','s2','s3','s4'].forEach(id=>$(id).textContent='-');
+    return;
+  }
+
+  try{
+    if(new Date(t1.time).getTime() <= new Date(t0.time).getTime()){
+      $('calc_valid').textContent = 'Info: T1 liegt vor/gleich T0. Bitte erst Start (T0), später Ende (T1) setzen.';
+      $('calc_valid').className = 'warn';
+      return;
+    }
+    const socDrop = (t0.soc ?? 0) - (t1.soc ?? 0);
+    const used = await computeUsedResetSafe(t0.time, t1.time);
+    const minDrop = parseNum($('minDrop').value) ?? 5;
+
+    const useAuto = $('autoAvgV').checked;
+    let avgV = parseNum($('avgV').value) ?? 51.8;
+    if(useAuto){
+      avgV = await computeAvgVoltage(t0.time, t1.time);
+      $('avgV').value = avgV.toFixed(2);
+      $('avgV').disabled = true;
+      $('avgVInfo').textContent = `V_mittel auto (T0..T1): ${avgV.toFixed(2)} V`;
+    } else {
+      $('avgV').disabled = false;
+      $('avgVInfo').textContent = `V_mittel manuell: ${avgV.toFixed(2)} V`;
+    }
+
+    const capKWh = socDrop >= minDrop && socDrop > 0 ? (used * 100 / socDrop) : null;
+    const capAh = capKWh ? (capKWh * 1000 / avgV) : null;
+
+    const nowIso = new Date().toISOString();
+    $('calc_drop').textContent = withUpdText(fmt(socDrop,' %-Punkte'), nowIso);
+    $('calc_used').textContent = withUpdText(fmt(used,' kWh'), nowIso);
+    $('calc_kwh').textContent = capKWh===null ? withUpdText('nicht valide (< SoC-Drop Schwelle)', nowIso) : withUpdText(fmt(capKWh,' kWh'), nowIso);
+    $('calc_ah').textContent = capAh===null ? withUpdText('nicht valide', nowIso) : withUpdText(fmt(capAh,' Ah'), nowIso);
+    $('s1').textContent = fmt(socDrop, ' %-Punkte');
+    $('s2').textContent = fmt(used, ' kWh');
+    $('s3').textContent = capKWh===null ? 'n/a' : fmt(capKWh,' kWh');
+    $('s4').textContent = capAh===null ? 'n/a' : fmt(capAh,' Ah');
+
+    let valid=[];
+    if(socDrop < minDrop) valid.push('SoC-Drop zu klein');
+    if(used <= 0) valid.push('kWh_used <= 0');
+    if((t1.minV ?? 99) < 2.9) valid.push('MinCellVolt sehr niedrig');
+    $('calc_valid').textContent = valid.length ? `⚠ ${valid.join(' | ')}` : '✅ Plausibel';
+    $('calc_valid').className = valid.length ? 'warn' : 'ok';
+  }catch(err){
+    $('calc_valid').textContent = `Info: Berechnung gerade nicht möglich (${err.message})`;
+    $('calc_valid').className = 'warn';
+    $('avgVInfo').textContent = 'V_mittel: nicht verfügbar';
+    ['s2','s3','s4'].forEach(id=>$(id).textContent='Fehler');
+  }
+}
+
+function drawLineChart(canvasId, seriesList, opts={}){
+  const c=$(canvasId),ctx=c.getContext('2d');
+  const w=c.width,h=c.height,pL=54,pR=14,pT=16,pB=30;
+  ctx.clearRect(0,0,w,h);
+  const all = seriesList.flatMap(s=>s.points.map(p=>p.v)).filter(v=>v!==null);
+  if(!all.length) return;
+  const min = Math.min(...all), max = Math.max(...all), span=(max-min)||1;
+  const maxN = Math.max(...seriesList.map(s=>s.points.length));
+
+  for(let i=0;i<6;i++){
+    const y0 = pT + i*(h-pT-pB)/6;
+    const y1 = pT + (i+1)*(h-pT-pB)/6;
+    ctx.fillStyle = i%2===0 ? '#0e1622' : '#111b28';
+    ctx.fillRect(pL,y0,w-pL-pR,y1-y0);
+  }
+
+  ctx.strokeStyle='#2c3f5c'; ctx.fillStyle='#8fa4ba'; ctx.font='11px sans-serif';
+  for(let i=0;i<=5;i++){
+    const y=pT+i*(h-pT-pB)/5;
+    const v=max - (i/5)*span;
+    ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(w-pR,y); ctx.stroke();
+    ctx.fillText(v.toFixed(2), 4, y+4);
+  }
+
+  const startTs = opts.startTs ?? Date.now()-24*60*60*1000;
+  const endTs = opts.endTs ?? Date.now();
+  for(let i=0;i<=6;i++){
+    const x=pL+i*(w-pL-pR)/6;
+    ctx.beginPath(); ctx.moveTo(x,h-pB); ctx.lineTo(x,h-pB+4); ctx.stroke();
+    const ts = startTs + (i/6)*(endTs-startTs);
+    const d = new Date(ts);
+    const label = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(label, x-16, h-8);
+  }
+
+  const pts=[];
+  seriesList.forEach(s=>{
+    ctx.strokeStyle=s.color; ctx.lineWidth=s.width||1.7; ctx.beginPath();
+    s.points.forEach((pt,i)=>{
+      if(pt.v===null) return;
+      const x=pL + (i/Math.max(1,maxN-1))*(w-pL-pR);
+      const y=h-pB - ((pt.v-min)/span)*(h-pT-pB);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      pts.push({x,y,name:s.name,v:pt.v,t:pt.t,color:s.color});
+    });
+    ctx.stroke();
+  });
+  chartState[canvasId] = { pts, minY:pT, maxY:h-pB, seriesList, opts };
+}
+
+function setupLineTooltip(canvasId, tooltipId){
+  const c=$(canvasId), tt=$(tooltipId);
+  c.onmousemove=(e)=>{
+    const st=chartState[canvasId]; if(!st) return;
+    const r=c.getBoundingClientRect();
+    const x=(e.clientX-r.left)*(c.width/r.width);
+    const y=(e.clientY-r.top)*(c.height/r.height);
+    let best=null,bd=9999;
+    for(const p of st.pts){ const d=Math.hypot(p.x-x,p.y-y); if(d<bd){bd=d;best=p;} }
+    if(!best || bd>22){ tt.style.display='none'; return; }
+
+    drawLineChart(canvasId, st.seriesList, st.opts);
+    const ctx=c.getContext('2d');
+    ctx.setLineDash([5,4]); ctx.strokeStyle='#9ec5ff';
+    ctx.beginPath(); ctx.moveTo(best.x, st.minY); ctx.lineTo(best.x, st.maxY); ctx.stroke(); ctx.setLineDash([]);
+
+    tt.style.display='block';
+    tt.innerHTML=`<b>${best.name}</b><br>${best.v.toFixed(3)}<br><span style="color:#9fb0c3">${new Date(best.t).toLocaleString()}</span>`;
+    tt.style.left=Math.min(r.width-220, Math.max(8, e.clientX-r.left+12))+'px';
+    tt.style.top=Math.min(r.height-70, Math.max(8, e.clientY-r.top-8))+'px';
+  };
+  c.onmouseleave=()=>{ tt.style.display='none'; const st=chartState[canvasId]; if(st) drawLineChart(canvasId, st.seriesList, st.opts); };
+}
+
+function drawBars(canvasId, pairs){
+  const c=$(canvasId),ctx=c.getContext('2d');
+  const w=c.width,h=c.height,pL=64,pR=24,pT=20,pB=36; ctx.clearRect(0,0,w,h);
+  if(!pairs.length) return;
+
+  const min=2.50, max=3.75, span=max-min;
+  for(let i=0;i<6;i++){
+    const y0 = pT + i*(h-pT-pB)/6;
+    const y1 = pT + (i+1)*(h-pT-pB)/6;
+    ctx.fillStyle = i%2===0 ? '#0e1622' : '#111b28';
+    ctx.fillRect(pL,y0,w-pL-pR,y1-y0);
+  }
+
+  ctx.strokeStyle='#253750'; ctx.fillStyle='#8fa4ba'; ctx.font='11px sans-serif';
+  for(let i=0;i<=5;i++){
+    const y=pT+i*(h-pT-pB)/5;
+    const v=max - (i/5)*span;
+    ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(w-pR,y); ctx.stroke();
+    ctx.fillText(v.toFixed(2)+' V', 8, y+4);
+  }
+
+  const bw=(w-pL-pR)/pairs.length;
+  hoverCells.bars=[];
+  pairs.forEach((d,i)=>{
+    const x=pL+i*bw+1;
+    const vv=Math.max(min, Math.min(max, d.v));
+    const y=h-pB - ((vv-min)/span)*(h-pT-pB);
+    const ww=Math.max(1,bw-2), hh=h-pB-y;
+    ctx.fillStyle='#2f8fe8';
+    ctx.fillRect(x,y,ww,hh);
+    hoverCells.bars.push({x,y,w:ww,h:hh,idx:d.idx,v:d.v});
+    if(i%4===0){ ctx.fillStyle='#8fa4ba'; ctx.fillText(String(d.idx),x,h-10); }
+  });
+}
+
+function setupCellTooltip(){
+  const cell=$('cellChart'), tt=$('cellTooltip');
+  cell.onmousemove = (e)=>{
+    const r=cell.getBoundingClientRect(); const x=(e.clientX-r.left)*(cell.width/r.width), y=(e.clientY-r.top)*(cell.height/r.height);
+    const b=hoverCells.bars.find(b=>x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h);
+    if(!b){tt.style.display='none';return;}
+    tt.style.display='block';
+    tt.innerHTML=`<b>Zelle ${b.idx}</b><br>${b.v?.toFixed(3)} V`;
+    tt.style.left=Math.min(r.width-140,Math.max(8,e.clientX-r.left+12))+'px';
+    tt.style.top=Math.min(r.height-52,Math.max(8,e.clientY-r.top-8))+'px';
+  };
+  cell.onmouseleave=()=>tt.style.display='none';
+}
+
+async function refreshAll(){
+  if(!cfg.url || !cfg.token) return;
+  const end = new Date().toISOString();
+  const start = new Date(Date.now()-24*60*60*1000).toISOString();
+  try{
+    const [states, sSoc,sMinV,sMaxV,sCum,sCur,sVol,essState, hSoc,hMin,hMax,hCum,hCur,hVol] = await Promise.all([
+      getStates(),
+      getState(E.soc), getState(E.minV), getState(E.maxV), getState(E.cum), getState(E.current), getState(E.voltage), getState(E.essMinSoc),
+      getHistory(E.soc,start,end), getHistory(E.minV,start,end), getHistory(E.maxV,start,end), getHistory(E.cum,start,end), getHistory(E.current,start,end), getHistory(E.voltage,start,end)
+    ]);
+
+    const soc = parseNum(sSoc.state), minV = parseNum(sMinV.state), cum = parseNum(sCum.state), cur=parseNum(sCur.state), vol=parseNum(sVol.state);
+    const power = (cur!==null && vol!==null) ? cur*vol : null;
+    live = { time: sSoc.last_changed, soc, minV, cum };
+
+    const cells = states
+      .map(s=>({id:s.entity_id, v:parseNum(s.state)}))
+      .filter(s=>/^sensor\.batrium_zelle(\d+)_maxcellvolt$/.test(s.id))
+      .map(s=>({idx:Number(/^sensor\.batrium_zelle(\d+)_maxcellvolt$/.exec(s.id)[1]), v:s.v}))
+      .filter(c=>c.idx>=1&&c.idx<=32)
+      .sort((a,b)=>a.idx-b.idx);
+
+    const maxV = cells.length ? Math.max(...cells.map(c=>c.v).filter(v=>v!==null)) : parseNum(sMaxV.state);
+
+    const updSoc = sSoc.last_changed;
+    const updMin = sMinV.last_changed;
+    const updMax = sMaxV.last_changed;
+    const updCum = sCum.last_changed;
+    const updCur = sCur.last_changed;
+    const updVol = sVol.last_changed;
+    const updPower = (new Date(updCur) > new Date(updVol)) ? updCur : updVol;
+    $('socLive').innerHTML = withUpdHtml(fmt7(soc,'%'), updSoc);
+    $('minCellLive').innerHTML = withUpdHtml(`${fmt7(minV,'V')} / ${fmt7(maxV,'V')}`, updMin);
+    $('maxCellLive').innerHTML = withUpdHtml(fmt7(maxV,'V'), updMax);
+    $('shuntVLive').innerHTML = withUpdHtml(fmt7(vol,'V'), updVol);
+    $('shuntALive').innerHTML = withUpdHtml(fmt7(cur,'A'), updCur);
+    $('shuntWLive').innerHTML = withUpdHtml(fmt7(power,'W'), updPower);
+
+    const stop = parseNum($('stopVolt').value) ?? 3.0;
+    $('status').textContent = minV <= stop ? 'STOP' : 'OK';
+    $('status').className = 'kpi ' + (minV <= stop ? 'bad' : 'ok');
+
+    const essVal = parseNum(essState.state);
+    $('essInfo').textContent = `Aktueller ESS Mindest-SoC: ${withUpdText(fmt(essVal,' %'), essState.last_changed)}`;
+    if(!$('essTargetSlider').dataset.userEditing){
+      $('essTargetSlider').value = Number.isFinite(essVal) ? essVal : 20;
+      $('essTargetLabel').textContent = `${Math.round(Number($('essTargetSlider').value))} %`;
+    }
+
+    const map = h => h.map(r=>({t:r.last_changed, v:parseNum(r.state)}));
+    const curPts = map(hCur);
+    const volPts = map(hVol);
+    const socSeries = [
+      {name:'SoC %', color:'#64b5f6', points:map(hSoc)}
+    ];
+    const cellVoltSeries = [
+      {name:'MinCellVolt V', color:'#ffb74d', points:map(hMin)},
+      {name:'MaxCellVolt V', color:'#4dd0e1', points:map(hMax)}
+    ];
+    const shuntSeries = [
+      {name:'ShuntVoltage V', color:'#ba68c8', points:volPts},
+      {name:'ShuntCurrent A', color:'#e57373', points:curPts},
+      {name:'ShuntPower W', color:'#81c784', points:volPts.map((p,i)=>({t:p.t, v:(p.v!==null && curPts[i]?.v!==null)?p.v*curPts[i].v:null}))}
+    ];
+    const cumSeries = [{name:'CumDischg kWh', color:'#90caf9', points:map(hCum)}];
+
+    const chartOpts = { startTs: new Date(start).getTime(), endTs: new Date(end).getTime() };
+    drawLineChart('trendSocChart',socSeries,chartOpts);
+    drawLineChart('trendCellVoltChart',cellVoltSeries,chartOpts);
+    drawLineChart('trendShuntChart',shuntSeries,chartOpts);
+    drawLineChart('trendCumChart',cumSeries,chartOpts);
+    drawBars('cellChart', cells);
+
+    const dup20 = states.some(s=>s.entity_id==='sensor.batrium_zelle20_maxcellvolt_2');
+    $('cellInfo').textContent = `Angezeigt: ${cells.length} Zellen (1..32). Y-Achse fix 2.50V..3.75V. Zelle20_2 ${dup20?'vorhanden aber gefiltert':'nicht vorhanden'}.`;
+    $('connState').textContent = `Verbunden · letzter Poll: ${new Date().toLocaleTimeString()}`;
+
+    calc();
+  }catch(e){
+    $('connState').textContent = `Fehler: ${e.message}`;
+    $('calc_valid').textContent = `Info: Live ok, Berechnung gerade nicht möglich (${e.message})`;
+    $('calc_valid').className = 'warn';
+  }
+}
+
+$('connectBtn').onclick = async ()=>{ saveCfg(); await refreshAll(); };
+$('setStartNow').onclick = ()=>{ if(!live) return; t0={...live}; t1=null; localStorage.setItem('batriumT0', JSON.stringify(t0)); localStorage.removeItem('batriumT1'); updateTViews(); calc(); };
+$('setEndNow').onclick = ()=>{
+  if(!t0){
+    $('calc_valid').textContent = 'Info: Erst T0 setzen, dann T1.';
+    $('calc_valid').className = 'warn';
+    return;
+  }
+  if(!live) return;
+  t1={...live}; localStorage.setItem('batriumT1', JSON.stringify(t1)); updateTViews(); calc();
+};
+$('clearStart').onclick = ()=>{ t0=null; t1=null; localStorage.removeItem('batriumT0'); localStorage.removeItem('batriumT1'); updateTViews(); calc(); };
+$('clearEnd').onclick = ()=>{ t1=null; localStorage.removeItem('batriumT1'); updateTViews(); calc(); };
+$('avgV').oninput = calc; $('minDrop').oninput = calc; $('stopVolt').oninput = calc;
+$('autoAvgV').onchange = ()=>{ $('avgV').disabled = $('autoAvgV').checked; calc(); };
+
+$('essTargetSlider').oninput = ()=>{
+  $('essTargetSlider').dataset.userEditing = '1';
+  $('essTargetLabel').textContent = `${Math.round(Number($('essTargetSlider').value))} %`;
+};
+$('essTargetSlider').onchange = ()=>{ setTimeout(()=>delete $('essTargetSlider').dataset.userEditing, 1000); };
+$('setEssTargetBtn').onclick = async ()=>{
+  try{
+    saveCfg();
+    const v = Math.max(0,Math.min(100,Number($('essTargetSlider').value)));
+    await setNumber(E.essMinSoc, v);
+    $('essInfo').textContent = `ESS Mindest-SoC gesetzt auf ${v.toFixed(0)} %`;
+    await refreshAll();
+  }catch(e){
+    $('essInfo').textContent = `Fehler beim Setzen: ${e.message}`;
+  }
+};
+$('ess20Btn').onclick = ()=>{ $('essTargetSlider').value=20; $('essTargetLabel').textContent='20 %'; $('setEssTargetBtn').click(); };
+$('ess100Btn').onclick = ()=>{ $('essTargetSlider').value=100; $('essTargetLabel').textContent='100 %'; $('setEssTargetBtn').click(); };
+
+$('avgV').disabled = $('autoAvgV').checked;
+updateTViews();
+setupCellTooltip();
+setupLineTooltip('trendSocChart','ttSoc');
+setupLineTooltip('trendCellVoltChart','ttCellVolt');
+setupLineTooltip('trendShuntChart','ttShunt');
+setupLineTooltip('trendCumChart','ttCum');
+if(cfg.url && cfg.token) refreshAll();
+calc();
+setInterval(refreshAll, 15000);
+</script>
+</body>
+</html>

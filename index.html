@@ -9,12 +9,13 @@
     body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text)}
     .wrap{max-width:1400px;margin:20px auto;padding:0 16px}
     h1{margin:0 0 12px;font-size:24px}
-    h3{margin:4px 0 10px}
+    h3{margin:4px 0 10px;min-height:28px}
     .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
     .card{background:var(--card);border:1px solid #233044;border-radius:12px;padding:12px}
     .span-12{grid-column:span 12}.span-6{grid-column:span 6}.span-4{grid-column:span 4}.span-3{grid-column:span 3}.span-2{grid-column:span 2}
     label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
     input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #2a3950;background:#0f1520;color:var(--text)}
+    input[type="range"]{padding:0;height:24px}
     button{cursor:pointer;background:#1b2b43}
     button:hover{filter:brightness(1.1)}
     .kpi{font-size:26px;font-weight:700}
@@ -24,10 +25,20 @@
     .muted{color:var(--muted);font-size:12px}
     .row{display:flex;gap:8px;align-items:center}
     .row > *{flex:1}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    td,th{border-bottom:1px solid #223044;padding:8px;text-align:left}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    td,th{border-bottom:1px solid #223044;padding:10px;text-align:left;vertical-align:top}
+    .steps td:nth-child(2){color:#d5e3f3;line-height:1.35}
+    .steps td:nth-child(3){font-weight:700}
+    .hint{background:#0f1724;border:1px solid #2a3950;border-radius:10px;padding:10px 12px;color:#c9d7e8;font-size:13px;line-height:1.4;margin-bottom:10px}
     .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-    .chart{width:100%;height:220px;border:1px solid #223044;border-radius:8px;background:#0e1520}
+    .step-ok{color:var(--ok)!important}
+    .step-warn{color:var(--warn)!important}
+    .step-na{color:var(--muted)!important}
+    .step-err{color:var(--bad)!important}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;margin-left:8px;vertical-align:middle}
+    .badge-ok{background:rgba(37,194,110,.16);color:#7fe9ae;border:1px solid rgba(37,194,110,.35)}
+    .badge-warn{background:rgba(240,180,41,.16);color:#ffd98a;border:1px solid rgba(240,180,41,.35)}
+    .chart{width:100%;height:260px;border:1px solid #223044;border-radius:8px;background:#0e1520;image-rendering:auto}
     .chartWrap{position:relative}
     .tt{position:absolute;pointer-events:none;background:#0a1019;border:1px solid #35507a;color:#e8f0fb;padding:6px 8px;border-radius:8px;font-size:12px;display:none;white-space:nowrap;z-index:10}
     .essVal{font-size:24px;font-weight:700;min-width:80px;text-align:center}
@@ -57,8 +68,8 @@
         <div class="muted" id="connState">Nicht verbunden</div>
       </div>
 
-      <div class="card span-3"><div class="muted">Min Cell V</div><div class="kpi7" id="minCellLive">-</div></div>
-      <div class="card span-3"><div class="muted">Max Cell V</div><div class="kpi7" id="maxCellLive">-</div></div>
+      <div class="card span-3"><div class="muted">Min Cell V (inkl. Zellnummer)</div><div class="kpi7" id="minCellLive">-</div></div>
+      <div class="card span-3"><div class="muted">Max Cell V (inkl. Zellnummer)</div><div class="kpi7" id="maxCellLive">-</div></div>
       <div class="card span-2"><div class="muted">SoC</div><div class="kpi7" id="socLive">-</div></div>
       <div class="card span-2"><div class="muted">Shunt V</div><div class="kpi7" id="shuntVLive">-</div></div>
       <div class="card span-2"><div class="muted">Shunt A</div><div class="kpi7" id="shuntALive">-</div></div>
@@ -66,7 +77,7 @@
       <div class="card span-2"><div class="muted">Status</div><div class="kpi" id="status">-</div></div>
 
       <div class="card span-12">
-        <h3>ESS Ziel-SoC (number.victron_settings_ess_batterylife_minimumsoc)</h3>
+        <h3>ESS Ziel-SoC</h3>
         <div class="row">
           <div style="flex:4">
             <input id="essTargetSlider" type="range" min="0" max="100" step="1" value="20" />
@@ -79,25 +90,33 @@
         <div class="muted" id="essInfo">-</div>
       </div>
 
-      <div class="card span-3">
+      <div class="card span-2">
         <h3>Trend SoC (24h)</h3>
-        <div class="chartWrap"><canvas id="trendSocChart" class="chart" width="320" height="220"></canvas><div id="ttSoc" class="tt"></div></div>
+        <div class="chartWrap"><canvas id="trendSocChart" class="chart" width="260" height="220"></canvas><div id="ttSoc" class="tt"></div></div>
       </div>
-      <div class="card span-3">
+      <div class="card span-2">
         <h3>Trend Zellspannung Min/Max (24h)</h3>
-        <div class="chartWrap"><canvas id="trendCellVoltChart" class="chart" width="320" height="220"></canvas><div id="ttCellVolt" class="tt"></div></div>
+        <div class="chartWrap"><canvas id="trendCellVoltChart" class="chart" width="260" height="220"></canvas><div id="ttCellVolt" class="tt"></div></div>
       </div>
-      <div class="card span-3">
-        <h3>Trend Shunt V/A/W (24h)</h3>
-        <div class="chartWrap"><canvas id="trendShuntChart" class="chart" width="320" height="220"></canvas><div id="ttShunt" class="tt"></div></div>
+      <div class="card span-2">
+        <h3>Trend Shunt V (24h)</h3>
+        <div class="chartWrap"><canvas id="trendShuntVChart" class="chart" width="260" height="220"></canvas><div id="ttShuntV" class="tt"></div></div>
       </div>
-      <div class="card span-3">
+      <div class="card span-2">
+        <h3>Trend Shunt A (24h)</h3>
+        <div class="chartWrap"><canvas id="trendShuntAChart" class="chart" width="260" height="220"></canvas><div id="ttShuntA" class="tt"></div></div>
+      </div>
+      <div class="card span-2">
+        <h3>Trend Shunt W (24h)</h3>
+        <div class="chartWrap"><canvas id="trendShuntWChart" class="chart" width="260" height="220"></canvas><div id="ttShuntW" class="tt"></div></div>
+      </div>
+      <div class="card span-2">
         <h3>Trend CumDischg (24h)</h3>
-        <div class="chartWrap"><canvas id="trendCumChart" class="chart" width="320" height="220"></canvas><div id="ttCum" class="tt"></div></div>
+        <div class="chartWrap"><canvas id="trendCumChart" class="chart" width="260" height="220"></canvas><div id="ttCum" class="tt"></div></div>
       </div>
 
       <div class="card span-12">
-        <h3>Live Zellenspannungen (32 Zellen, _2 gefiltert)</h3>
+        <h3>Live Zellenspannungen</h3>
         <div class="chartWrap">
           <canvas id="cellChart" class="chart" width="1200" height="260"></canvas>
           <div id="cellTooltip" class="tt"></div>
@@ -160,18 +179,22 @@
           <tr><th>kWh_used (resetfest)</th><td id="calc_used">-</td></tr>
           <tr><th>Kapazität_kWh</th><td id="calc_kwh">-</td></tr>
           <tr><th>Kapazität_Ah</th><td id="calc_ah">-</td></tr>
-          <tr><th>Validierung</th><td id="calc_valid">Warte auf T0/T1</td></tr>
+          <tr><th>Validierung</th><td><span id="calc_valid">Warte auf T0/T1</span><span id="calc_reason_badge" class="badge badge-warn">Warten</span></td></tr>
         </table>
       </div>
 
       <div class="card span-12">
-        <h3>Rechenschritte (transparent)</h3>
-        <table>
-          <tr><th>Schritt</th><th>Formel</th><th>Wert</th></tr>
-          <tr><td>1</td><td>SoC_drop = SoC_start - SoC_end</td><td id="s1">-</td></tr>
-          <tr><td>2</td><td>kWh_used = Σ positive Δ(cum_dischg) (resetfest)</td><td id="s2">-</td></tr>
-          <tr><td>3</td><td>Kapazität_kWh = kWh_used × 100 / SoC_drop</td><td id="s3">-</td></tr>
-          <tr><td>4</td><td>Kapazität_Ah = Kapazität_kWh × 1000 / V_mittel</td><td id="s4">-</td></tr>
+        <h3>Rechenschritte (einfach erklärt)</h3>
+        <div class="hint">
+          Reihenfolge: <b>Start setzen (T0)</b> → später <b>Ende setzen (T1)</b> → App rechnet automatisch.<br>
+          Die App summiert nur positive Zähler-Schritte (resetfest), damit Tages-Resets den Test nicht verfälschen.
+        </div>
+        <table class="steps">
+          <tr><th>Schritt</th><th>Einfach erklärt</th><th>Ergebnis</th></tr>
+          <tr><td>1</td><td>SoC-Verlust = Start-SoC minus End-SoC (in %-Punkten)</td><td id="s1">-</td></tr>
+          <tr><td>2</td><td>Entnommene Energie = Summe aller positiven Zähleranstiege zwischen T0 und T1</td><td id="s2">-</td></tr>
+          <tr><td>3</td><td>Gesamtkapazität in kWh = Entnommene Energie auf 100% SoC hochgerechnet</td><td id="s3">-</td></tr>
+          <tr><td>4</td><td>Gesamtkapazität in Ah = kWh in Wh umrechnen (×1000) und durch mittlere Spannung teilen</td><td id="s4">-</td></tr>
         </table>
       </div>
     </div>
@@ -223,8 +246,39 @@ function parseNum(x){ const v = Number(x); return Number.isFinite(v) ? v : null;
 function fmt(v, u=''){ return (v===null||v===undefined||Number.isNaN(v)) ? '-' : `${v.toFixed(2)}${u}`; }
 function fmt7(v,u=''){ return (v===null||v===undefined||Number.isNaN(v)) ? '--.--' : `${v.toFixed(2)}${u}`; }
 function tstamp(iso){ if(!iso) return '-'; const d=new Date(iso); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; }
+function dtstamp(iso){ if(!iso) return '-'; const d=new Date(iso); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; }
 function withUpdText(val, iso){ return `${val}  ·  upd ${tstamp(iso)}`; }
 function withUpdHtml(val, iso){ return `<div class="val">${val}</div><div class="upd">upd ${tstamp(iso)}</div>`; }
+function prepareCanvas(canvasId, cssHeight=260){
+  const c=$(canvasId);
+  const dpr=window.devicePixelRatio || 1;
+  const w=Math.max(240, Math.floor(c.clientWidth));
+  const h=cssHeight;
+  c.style.height = `${h}px`;
+  c.width = Math.floor(w*dpr);
+  c.height = Math.floor(h*dpr);
+  return c;
+}
+function setStepState(id, state){
+  const el=$(id); if(!el) return;
+  el.classList.remove('step-ok','step-warn','step-na','step-err');
+  if(state==='ok') el.classList.add('step-ok');
+  else if(state==='warn') el.classList.add('step-warn');
+  else if(state==='na') el.classList.add('step-na');
+  else if(state==='err') el.classList.add('step-err');
+}
+function setValidationText(text, kind='warn', reason=''){
+  $('calc_valid').textContent = text;
+  $('calc_valid').className = kind;
+  const b=$('calc_reason_badge');
+  if(kind==='ok'){
+    b.style.display='none';
+    return;
+  }
+  b.style.display='inline-block';
+  b.className = `badge badge-warn`;
+  b.textContent = reason || 'Hinweis';
+}
 
 function updateEndControls(){
   const canSetEnd = !!t0;
@@ -235,7 +289,7 @@ function updateEndControls(){
 
 function updateTViews(){
   for(const [p,obj] of [['t0',t0],['t1',t1]]){
-    $(`${p}_time`).textContent = obj?.time || '-';
+    $(`${p}_time`).textContent = obj?.time ? dtstamp(obj.time) : '-';
     $(`${p}_soc`).textContent = obj ? withUpdText(fmt(obj?.soc, ' %'), obj.time) : '-';
     $(`${p}_cum`).textContent = obj ? withUpdText(fmt(obj?.cum, ' kWh'), obj.time) : '-';
     $(`${p}_v`).textContent = obj ? withUpdText(fmt(obj?.minV, ' V'), obj.time) : '-';
@@ -268,16 +322,15 @@ async function computeAvgVoltage(startIso, endIso){
 async function calc(){
   if(!t0 || !t1){
     $('calc_drop').textContent='-';$('calc_used').textContent='-';$('calc_kwh').textContent='-';$('calc_ah').textContent='-';
-    $('calc_valid').textContent='Bitte T0 und T1 setzen';
+    setValidationText('Bitte T0 und T1 setzen','warn','Warten');
     $('avgVInfo').textContent='V_mittel: warte auf T0/T1';
-    ['s1','s2','s3','s4'].forEach(id=>$(id).textContent='-');
+    ['s1','s2','s3','s4'].forEach(id=>{ $(id).textContent='-'; setStepState(id,'na'); });
     return;
   }
 
   try{
     if(new Date(t1.time).getTime() <= new Date(t0.time).getTime()){
-      $('calc_valid').textContent = 'Info: T1 liegt vor/gleich T0. Bitte erst Start (T0), später Ende (T1) setzen.';
-      $('calc_valid').className = 'warn';
+      setValidationText('Info: T1 liegt vor/gleich T0. Bitte erst Start (T0), später Ende (T1) setzen.','warn','Reihenfolge');
       return;
     }
     const socDrop = (t0.soc ?? 0) - (t1.soc ?? 0);
@@ -309,23 +362,32 @@ async function calc(){
     $('s3').textContent = capKWh===null ? 'n/a' : fmt(capKWh,' kWh');
     $('s4').textContent = capAh===null ? 'n/a' : fmt(capAh,' Ah');
 
+    setStepState('s1', socDrop > 0 ? 'ok' : 'warn');
+    setStepState('s2', used > 0 ? 'ok' : 'warn');
+    setStepState('s3', capKWh===null ? 'na' : 'ok');
+    setStepState('s4', capAh===null ? 'na' : 'ok');
+
     let valid=[];
     if(socDrop < minDrop) valid.push('SoC-Drop zu klein');
     if(used <= 0) valid.push('kWh_used <= 0');
     if((t1.minV ?? 99) < 2.9) valid.push('MinCellVolt sehr niedrig');
-    $('calc_valid').textContent = valid.length ? `⚠ ${valid.join(' | ')}` : '✅ Plausibel';
-    $('calc_valid').className = valid.length ? 'warn' : 'ok';
+    if(valid.length){
+      setValidationText(`⚠ ${valid.join(' | ')}`,'warn',valid[0]);
+    } else {
+      setValidationText('Plausibel','ok','');
+    }
   }catch(err){
-    $('calc_valid').textContent = `Info: Berechnung gerade nicht möglich (${err.message})`;
-    $('calc_valid').className = 'warn';
+    setValidationText(`Info: Berechnung gerade nicht möglich (${err.message})`,'warn','Datenfehler');
     $('avgVInfo').textContent = 'V_mittel: nicht verfügbar';
-    ['s2','s3','s4'].forEach(id=>$(id).textContent='Fehler');
+    ['s2','s3','s4'].forEach(id=>{ $(id).textContent='Fehler'; setStepState(id,'err'); });
   }
 }
 
 function drawLineChart(canvasId, seriesList, opts={}){
-  const c=$(canvasId),ctx=c.getContext('2d');
-  const w=c.width,h=c.height,pL=54,pR=14,pT=16,pB=30;
+  const c=prepareCanvas(canvasId,260),ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio || 1;
+  const w=c.clientWidth,h=260,pL=54,pR=14,pT=16,pB=30;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
   const all = seriesList.flatMap(s=>s.points.map(p=>p.v)).filter(v=>v!==null);
   if(!all.length) return;
@@ -398,8 +460,11 @@ function setupLineTooltip(canvasId, tooltipId){
 }
 
 function drawBars(canvasId, pairs){
-  const c=$(canvasId),ctx=c.getContext('2d');
-  const w=c.width,h=c.height,pL=64,pR=24,pT=20,pB=36; ctx.clearRect(0,0,w,h);
+  const c=prepareCanvas(canvasId,260),ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio || 1;
+  const w=c.clientWidth,h=260,pL=64,pR=24,pT=20,pB=36;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
   if(!pairs.length) return;
 
   const min=2.50, max=3.75, span=max-min;
@@ -468,18 +533,23 @@ async function refreshAll(){
       .filter(c=>c.idx>=1&&c.idx<=32)
       .sort((a,b)=>a.idx-b.idx);
 
-    const maxV = cells.length ? Math.max(...cells.map(c=>c.v).filter(v=>v!==null)) : parseNum(sMaxV.state);
+    const validCellVals = cells.filter(c=>c.v!==null);
+    const minCellObj = validCellVals.length ? validCellVals.reduce((a,b)=> (a.v<=b.v?a:b)) : null;
+    const maxCellObj = validCellVals.length ? validCellVals.reduce((a,b)=> (a.v>=b.v?a:b)) : null;
+    const maxV = maxCellObj ? maxCellObj.v : parseNum(sMaxV.state);
+    const minVLive = minCellObj ? minCellObj.v : minV;
 
     const updSoc = sSoc.last_changed;
     const updMin = sMinV.last_changed;
-    const updMax = sMaxV.last_changed;
     const updCum = sCum.last_changed;
     const updCur = sCur.last_changed;
     const updVol = sVol.last_changed;
     const updPower = (new Date(updCur) > new Date(updVol)) ? updCur : updVol;
     $('socLive').innerHTML = withUpdHtml(fmt7(soc,'%'), updSoc);
-    $('minCellLive').innerHTML = withUpdHtml(`${fmt7(minV,'V')} / ${fmt7(maxV,'V')}`, updMin);
-    $('maxCellLive').innerHTML = withUpdHtml(fmt7(maxV,'V'), updMax);
+    const minText = minCellObj ? `${fmt7(minVLive,'V')} (Z${minCellObj.idx})` : `${fmt7(minV,'V')} (Z?)`;
+    const maxText = maxCellObj ? `${fmt7(maxV,'V')} (Z${maxCellObj.idx})` : `${fmt7(maxV,'V')} (Z?)`;
+    $('minCellLive').innerHTML = withUpdHtml(minText, updMin);
+    $('maxCellLive').innerHTML = withUpdHtml(maxText, updMin);
     $('shuntVLive').innerHTML = withUpdHtml(fmt7(vol,'V'), updVol);
     $('shuntALive').innerHTML = withUpdHtml(fmt7(cur,'A'), updCur);
     $('shuntWLive').innerHTML = withUpdHtml(fmt7(power,'W'), updPower);
@@ -505,29 +575,27 @@ async function refreshAll(){
       {name:'MinCellVolt V', color:'#ffb74d', points:map(hMin)},
       {name:'MaxCellVolt V', color:'#4dd0e1', points:map(hMax)}
     ];
-    const shuntSeries = [
-      {name:'ShuntVoltage V', color:'#ba68c8', points:volPts},
-      {name:'ShuntCurrent A', color:'#e57373', points:curPts},
-      {name:'ShuntPower W', color:'#81c784', points:volPts.map((p,i)=>({t:p.t, v:(p.v!==null && curPts[i]?.v!==null)?p.v*curPts[i].v:null}))}
-    ];
+    const shuntVSeries = [{name:'ShuntVoltage V', color:'#ba68c8', points:volPts}];
+    const shuntASeries = [{name:'ShuntCurrent A', color:'#e57373', points:curPts}];
+    const shuntWSeries = [{name:'ShuntPower W', color:'#81c784', points:volPts.map((p,i)=>({t:p.t, v:(p.v!==null && curPts[i]?.v!==null)?p.v*curPts[i].v:null}))}];
     const cumSeries = [{name:'CumDischg kWh', color:'#90caf9', points:map(hCum)}];
 
     const chartOpts = { startTs: new Date(start).getTime(), endTs: new Date(end).getTime() };
     drawLineChart('trendSocChart',socSeries,chartOpts);
     drawLineChart('trendCellVoltChart',cellVoltSeries,chartOpts);
-    drawLineChart('trendShuntChart',shuntSeries,chartOpts);
+    drawLineChart('trendShuntVChart',shuntVSeries,chartOpts);
+    drawLineChart('trendShuntAChart',shuntASeries,chartOpts);
+    drawLineChart('trendShuntWChart',shuntWSeries,chartOpts);
     drawLineChart('trendCumChart',cumSeries,chartOpts);
     drawBars('cellChart', cells);
 
-    const dup20 = states.some(s=>s.entity_id==='sensor.batrium_zelle20_maxcellvolt_2');
-    $('cellInfo').textContent = `Angezeigt: ${cells.length} Zellen (1..32). Y-Achse fix 2.50V..3.75V. Zelle20_2 ${dup20?'vorhanden aber gefiltert':'nicht vorhanden'}.`;
+    $('cellInfo').textContent = `Angezeigt: ${cells.length} Zellen (1..32). Y-Achse fix 2.50V..3.75V.`;
     $('connState').textContent = `Verbunden · letzter Poll: ${new Date().toLocaleTimeString()}`;
 
     calc();
   }catch(e){
     $('connState').textContent = `Fehler: ${e.message}`;
-    $('calc_valid').textContent = `Info: Live ok, Berechnung gerade nicht möglich (${e.message})`;
-    $('calc_valid').className = 'warn';
+    setValidationText(`Info: Live ok, Berechnung gerade nicht möglich (${e.message})`,'warn','Live/History');
   }
 }
 
@@ -535,8 +603,7 @@ $('connectBtn').onclick = async ()=>{ saveCfg(); await refreshAll(); };
 $('setStartNow').onclick = ()=>{ if(!live) return; t0={...live}; t1=null; localStorage.setItem('batriumT0', JSON.stringify(t0)); localStorage.removeItem('batriumT1'); updateTViews(); calc(); };
 $('setEndNow').onclick = ()=>{
   if(!t0){
-    $('calc_valid').textContent = 'Info: Erst T0 setzen, dann T1.';
-    $('calc_valid').className = 'warn';
+    setValidationText('Info: Erst T0 setzen, dann T1.','warn','T0 fehlt');
     return;
   }
   if(!live) return;
@@ -571,7 +638,9 @@ updateTViews();
 setupCellTooltip();
 setupLineTooltip('trendSocChart','ttSoc');
 setupLineTooltip('trendCellVoltChart','ttCellVolt');
-setupLineTooltip('trendShuntChart','ttShunt');
+setupLineTooltip('trendShuntVChart','ttShuntV');
+setupLineTooltip('trendShuntAChart','ttShuntA');
+setupLineTooltip('trendShuntWChart','ttShuntW');
 setupLineTooltip('trendCumChart','ttCum');
 if(cfg.url && cfg.token) refreshAll();
 calc();
